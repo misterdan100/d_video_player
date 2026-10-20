@@ -1,0 +1,75 @@
+name: Build IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-ipa
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # Imagen de GitHub con Xcode 27 (Apple Silicon).
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Seleccionar Xcode 27
+        run: |
+          XC=$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XC" ]; then XC=/Applications/Xcode.app; fi
+          echo "Usando $XC"
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i iphoneos
+
+      - name: Instalar XcodeGen
+        run: brew install xcodegen
+
+      - name: Generar proyecto Xcode
+        run: xcodegen generate
+
+      - name: Compilar (sin firmar)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project DVideoPlayer.xcodeproj \
+            -scheme DVideoPlayer \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            build | xcbeautify
+
+      - name: Empaquetar .ipa
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/DVideoPlayer.app Payload/
+          zip -qry DVideoPlayer.ipa Payload
+          ls -la DVideoPlayer.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DVideoPlayer-ipa
+          path: DVideoPlayer.ipa
+          retention-days: 14
+
+      - name: Publicar Release "latest"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete latest --cleanup-tag --yes || true
+          gh release create latest DVideoPlayer.ipa \
+            --title "Build #${{ github.run_number }}" \
+            --notes "Commit ${{ github.sha }}" \
+            --prerelease
