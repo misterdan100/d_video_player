@@ -61,9 +61,8 @@ Comandos útiles:
 - [ ] **Pendientes posibles** — Recordar posición por video, imagen en imagen (PiP; ojo: con cuenta gratuita el background puede no funcionar), borrar videos desde la lista.
 
 ## Estado actual
-- Sesión 3 COMPILADA (2026-10-20): **v0.5.0 (build 5)**, commit `057a0fb`, run 39479805465 en verde. El `.ipa` ya está descargado en `C:\dev\d_video_player\DVideoPlayer.ipa`, listo para iLoader.
-- **PENDIENTE DE VALIDAR en el iPhone**: velocidad (y que se mantenga tras pausa/scrub), lista de videos en Documents, mover el panel a los 4 bordes (vertical en laterales), aspecto Liquid Glass, y que tap/scrub sigan funcionando igual.
-- Sesión 2 validada antes: v0.4.0 (build 4), todo perfecto.
+- Sesión 3 VALIDADA en el iPhone (2026-10-20): Daniel probó la v0.5.0 y dijo que "funciona muy bien" (velocidad, lista, panel reposicionable, Liquid Glass).
+- Ajuste posterior: **v0.5.1 (build 6)**, commit `f847b10`, run 39481395603 en verde — se agregaron velocidades lentas 0.25 / 0.4 / 0.7 / 0.8. El `.ipa` ya está descargado en `C:\dev\d_video_player\DVideoPlayer.ipa`, listo para iLoader. Pendiente solo confirmar la v0.5.1 instalada.
 
 ## Problemas conocidos
 - Los archivos de `.github/workflows` están protegidos para las herramientas remotas: el asistente no puede escribirlos. Si hay que cambiar el workflow, dejar el archivo en una carpeta temporal y pedirle a Daniel que lo mueva a `.github\workflows\`.
