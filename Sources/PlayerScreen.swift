@@ -4,8 +4,8 @@ import UIKit
 
 /// Pantalla de reproducción.
 /// - Un toque = play/pause (con ícono de confirmación que se desvanece).
+/// - Mantener presionado + arrastrar horizontal = scrub (seek en vivo).
 /// - La pantalla no se apaga mientras esta vista está activa.
-/// - El scrub (mantener + arrastrar) llega en la Sesión 2.
 struct PlayerScreen: View {
     let video: VideoSelection
     let onClose: () -> Void
@@ -17,6 +17,18 @@ struct PlayerScreen: View {
     @State private var durationText = "--:--"
     @State private var timeObserver: Any?
 
+    // MARK: Estado del scrub
+    @State private var isScrubbing = false
+    @State private var wasPlayingBeforeScrub = false
+    @State private var scrubStartSeconds: Double = 0
+    @State private var scrubTargetSeconds: Double = 0
+    @State private var viewWidth: CGFloat = 0
+    @State private var isSeekInFlight = false
+    @State private var pendingSeekSeconds: Double?
+
+    /// Sensibilidad fija: arrastrar todo el ancho de la pantalla ≈ 90 segundos.
+    private let secondsPerFullWidth: Double = 90
+
     init(video: VideoSelection, onClose: @escaping () -> Void) {
         self.video = video
         self.onClose = onClose
@@ -24,43 +36,55 @@ struct PlayerScreen: View {
     }
 
     var body: some View {
-        ZStack {
-            Color.black
-            VideoLayerView(player: player)
+        GeometryReader { geo in
+            ZStack {
+                Color.black
+                VideoLayerView(player: player)
 
-            // Ícono grande de confirmación al tocar (play/pause/replay).
-            if let feedbackSymbol {
-                Image(systemName: feedbackSymbol)
-                    .font(.system(size: 72))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .shadow(radius: 8)
-                    .transition(.opacity)
-            }
+                // Ícono grande de confirmación al tocar (play/pause/replay).
+                if let feedbackSymbol {
+                    Image(systemName: feedbackSymbol)
+                        .font(.system(size: 72))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .shadow(radius: 8)
+                        .transition(.opacity)
+                }
 
-            VStack {
-                HStack {
-                    Button(action: onClose) {
-                        Image(systemName: "xmark")
-                            .font(.title3.bold())
-                            .foregroundStyle(.white)
-                            .padding(10)
-                            .background(.black.opacity(0.4), in: Circle())
+                // Indicador de scrub: tiempo destino + diferencia.
+                if isScrubbing {
+                    scrubIndicator
+                }
+
+                VStack {
+                    HStack {
+                        Button(action: onClose) {
+                            Image(systemName: "xmark")
+                                .font(.title3.bold())
+                                .foregroundStyle(.white)
+                                .padding(10)
+                                .background(.black.opacity(0.4), in: Circle())
+                        }
+                        Spacer()
                     }
                     Spacer()
+                    Text("\(currentTimeText) / \(durationText)")
+                        .font(.footnote.monospacedDigit())
+                        .foregroundStyle(.white.opacity(0.8))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(.black.opacity(0.4), in: Capsule())
                 }
-                Spacer()
-                Text("\(currentTimeText) / \(durationText)")
-                    .font(.footnote.monospacedDigit())
-                    .foregroundStyle(.white.opacity(0.8))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(.black.opacity(0.4), in: Capsule())
+                .padding()
             }
-            .padding()
+            .onAppear { viewWidth = geo.size.width }
+            .onChange(of: geo.size.width) { _, newWidth in
+                viewWidth = newWidth
+            }
         }
         .ignoresSafeArea()
         .contentShape(Rectangle())
         .onTapGesture { togglePlayPause() }
+        .gesture(scrubGesture)
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
         .onAppear { start() }
@@ -71,6 +95,29 @@ struct PlayerScreen: View {
             guard (note.object as? AVPlayerItem) === player.currentItem else { return }
             playbackEnded()
         }
+    }
+
+    // MARK: - Vistas auxiliares
+
+    private var scrubIndicator: some View {
+        VStack(spacing: 6) {
+            Text(Self.format(scrubTargetSeconds))
+                .font(.system(size: 44, weight: .semibold).monospacedDigit())
+                .foregroundStyle(.white)
+            Text(deltaText)
+                .font(.title3.monospacedDigit())
+                .foregroundStyle(.white.opacity(0.8))
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 14)
+        .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 16))
+        .shadow(radius: 10)
+    }
+
+    private var deltaText: String {
+        let delta = scrubTargetSeconds - scrubStartSeconds
+        let sign = delta >= 0 ? "+" : "−"
+        return "\(sign)\(Self.format(abs(delta)))"
     }
 
     // MARK: - Ciclo de vida
@@ -110,6 +157,7 @@ struct PlayerScreen: View {
 
     /// Requisito 2: un toque en la pantalla = play/pause.
     private func togglePlayPause() {
+        guard !isScrubbing else { return }
         if isPlaying {
             player.pause()
             isPlaying = false
@@ -121,7 +169,87 @@ struct PlayerScreen: View {
         }
     }
 
+    /// Requisito 3: mantener presionado + arrastrar horizontal = scrub.
+    /// Long press (0.3 s) y después un drag; el video salta en vivo mientras se arrastra.
+    private var scrubGesture: some Gesture {
+        LongPressGesture(minimumDuration: 0.3)
+            .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .local))
+            .onChanged { value in
+                switch value {
+                case .second(true, let drag):
+                    if !isScrubbing { beginScrub() }
+                    if let drag {
+                        updateScrub(translationX: drag.translation.width)
+                    }
+                default:
+                    break
+                }
+            }
+            .onEnded { _ in
+                if isScrubbing { endScrub() }
+            }
+    }
+
+    private func beginScrub() {
+        isScrubbing = true
+        wasPlayingBeforeScrub = isPlaying
+        player.pause()
+        isPlaying = false
+        scrubStartSeconds = max(0, player.currentTime().seconds)
+        scrubTargetSeconds = scrubStartSeconds
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    }
+
+    private func updateScrub(translationX: CGFloat) {
+        let width = viewWidth > 0 ? viewWidth : UIScreen.main.bounds.width
+        let secondsPerPoint = secondsPerFullWidth / Double(width)
+        var target = scrubStartSeconds + Double(translationX) * secondsPerPoint
+
+        // Limitar entre 0 y la duración (si se conoce).
+        target = max(0, target)
+        if let duration = player.currentItem?.duration, duration.isNumeric {
+            target = min(target, max(0, duration.seconds - 0.1))
+        }
+
+        scrubTargetSeconds = target
+        currentTimeText = Self.format(target)
+        requestSeek(to: target)
+    }
+
+    private func endScrub() {
+        isScrubbing = false
+        requestSeek(to: scrubTargetSeconds)
+        if wasPlayingBeforeScrub {
+            player.play()
+            isPlaying = true
+        }
+    }
+
+    /// Seek "en vivo" sin saturar: si hay un seek en curso, se guarda el último
+    /// tiempo pedido y se ejecuta al terminar el anterior.
+    private func requestSeek(to seconds: Double) {
+        pendingSeekSeconds = seconds
+        guard !isSeekInFlight else { return }
+        performNextSeek()
+    }
+
+    private func performNextSeek() {
+        guard let seconds = pendingSeekSeconds else { return }
+        pendingSeekSeconds = nil
+        isSeekInFlight = true
+        let time = CMTime(seconds: seconds, preferredTimescale: 600)
+        player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
+            DispatchQueue.main.async {
+                isSeekInFlight = false
+                if pendingSeekSeconds != nil {
+                    performNextSeek()
+                }
+            }
+        }
+    }
+
     private func playbackEnded() {
+        guard !isScrubbing else { return }
         isPlaying = false
         player.seek(to: .zero)
         showFeedback("arrow.counterclockwise")
