@@ -1,7 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Sesión 1: elegir un MP4 desde la app Archivos y reproducirlo.
+/// Pantalla inicial: elegir un MP4 desde la app Archivos y reproducirlo.
 struct ContentView: View {
     @State private var video: VideoSelection?
     @State private var showPicker = false
@@ -48,8 +48,21 @@ struct ContentView: View {
                     .foregroundStyle(.red)
                     .multilineTextAlignment(.center)
             }
+
+            // Versión instalada, para verificar que corre el build correcto.
+            Text(Self.versionText)
+                .font(.footnote.monospacedDigit())
+                .foregroundStyle(.secondary)
         }
         .padding()
+    }
+
+    /// "v0.4.0 (build 4)" leído del Info.plist del bundle instalado.
+    private static var versionText: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "v\(version) (build \(build))"
     }
 
     private func handlePickerResult(_ result: Result<[URL], Error>) {

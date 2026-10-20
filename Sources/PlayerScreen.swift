@@ -4,8 +4,10 @@ import UIKit
 
 /// Pantalla de reproducción.
 /// - Un toque = play/pause (con ícono de confirmación que se desvanece).
-/// - Mantener presionado + arrastrar horizontal = scrub (seek en vivo).
+/// - Mantener presionado (0.3 s) + arrastrar horizontal = scrub con seek en vivo.
 /// - La pantalla no se apaga mientras esta vista está activa.
+/// Los gestos viven en VideoLayerView (UIKit); los controles (X, tiempo)
+/// respetan el safe area para no quedar debajo del Dynamic Island.
 struct PlayerScreen: View {
     let video: VideoSelection
     let onClose: () -> Void
@@ -22,7 +24,6 @@ struct PlayerScreen: View {
     @State private var wasPlayingBeforeScrub = false
     @State private var scrubStartSeconds: Double = 0
     @State private var scrubTargetSeconds: Double = 0
-    @State private var viewWidth: CGFloat = 0
     @State private var isSeekInFlight = false
     @State private var pendingSeekSeconds: Double?
 
@@ -36,55 +37,60 @@ struct PlayerScreen: View {
     }
 
     var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                Color.black
-                VideoLayerView(player: player)
+        ZStack {
+            Color.black
+                .ignoresSafeArea()
 
-                // Ícono grande de confirmación al tocar (play/pause/replay).
-                if let feedbackSymbol {
-                    Image(systemName: feedbackSymbol)
-                        .font(.system(size: 72))
-                        .foregroundStyle(.white.opacity(0.85))
-                        .shadow(radius: 8)
-                        .transition(.opacity)
-                }
+            // El video (y sus gestos) ocupa toda la pantalla.
+            VideoLayerView(
+                player: player,
+                onTap: { togglePlayPause() },
+                onScrubBegan: { beginScrub() },
+                onScrubMoved: { fraction in updateScrub(widthFraction: fraction) },
+                onScrubEnded: { endScrub() }
+            )
+            .ignoresSafeArea()
 
-                // Indicador de scrub: tiempo destino + diferencia.
-                if isScrubbing {
-                    scrubIndicator
-                }
+            // Ícono grande de confirmación al tocar (play/pause/replay).
+            if let feedbackSymbol {
+                Image(systemName: feedbackSymbol)
+                    .font(.system(size: 72))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .shadow(radius: 8)
+                    .transition(.opacity)
+                    .allowsHitTesting(false)
+            }
 
-                VStack {
-                    HStack {
-                        Button(action: onClose) {
-                            Image(systemName: "xmark")
-                                .font(.title3.bold())
-                                .foregroundStyle(.white)
-                                .padding(10)
-                                .background(.black.opacity(0.4), in: Circle())
-                        }
-                        Spacer()
+            // Indicador de scrub: tiempo destino + diferencia.
+            if isScrubbing {
+                scrubIndicator
+                    .allowsHitTesting(false)
+            }
+
+            // Controles: DENTRO del safe area (la X ya no queda bajo el Dynamic Island).
+            VStack {
+                HStack {
+                    Button(action: onClose) {
+                        Image(systemName: "xmark")
+                            .font(.title3.bold())
+                            .foregroundStyle(.white)
+                            .padding(12)
+                            .background(.black.opacity(0.4), in: Circle())
+                            .contentShape(Circle())
                     }
                     Spacer()
-                    Text("\(currentTimeText) / \(durationText)")
-                        .font(.footnote.monospacedDigit())
-                        .foregroundStyle(.white.opacity(0.8))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(.black.opacity(0.4), in: Capsule())
                 }
-                .padding()
+                Spacer()
+                Text("\(currentTimeText) / \(durationText)")
+                    .font(.footnote.monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.8))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(.black.opacity(0.4), in: Capsule())
+                    .allowsHitTesting(false)
             }
-            .onAppear { viewWidth = geo.size.width }
-            .onChange(of: geo.size.width) { _, newWidth in
-                viewWidth = newWidth
-            }
+            .padding()
         }
-        .ignoresSafeArea()
-        .contentShape(Rectangle())
-        .onTapGesture { togglePlayPause() }
-        .gesture(scrubGesture)
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
         .onAppear { start() }
@@ -134,6 +140,7 @@ struct PlayerScreen: View {
             forInterval: CMTime(seconds: 0.5, preferredTimescale: 600),
             queue: .main
         ) { time in
+            guard !isScrubbing else { return }
             currentTimeText = Self.format(time.seconds)
             if let duration = player.currentItem?.duration, duration.isNumeric {
                 durationText = Self.format(duration.seconds)
@@ -169,26 +176,7 @@ struct PlayerScreen: View {
         }
     }
 
-    /// Requisito 3: mantener presionado + arrastrar horizontal = scrub.
-    /// Long press (0.3 s) y después un drag; el video salta en vivo mientras se arrastra.
-    private var scrubGesture: some Gesture {
-        LongPressGesture(minimumDuration: 0.3)
-            .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .local))
-            .onChanged { value in
-                switch value {
-                case .second(true, let drag):
-                    if !isScrubbing { beginScrub() }
-                    if let drag {
-                        updateScrub(translationX: drag.translation.width)
-                    }
-                default:
-                    break
-                }
-            }
-            .onEnded { _ in
-                if isScrubbing { endScrub() }
-            }
-    }
+    // MARK: - Scrub (requisito 3)
 
     private func beginScrub() {
         isScrubbing = true
@@ -200,10 +188,9 @@ struct PlayerScreen: View {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 
-    private func updateScrub(translationX: CGFloat) {
-        let width = viewWidth > 0 ? viewWidth : UIScreen.main.bounds.width
-        let secondsPerPoint = secondsPerFullWidth / Double(width)
-        var target = scrubStartSeconds + Double(translationX) * secondsPerPoint
+    private func updateScrub(widthFraction: Double) {
+        guard isScrubbing else { return }
+        var target = scrubStartSeconds + widthFraction * secondsPerFullWidth
 
         // Limitar entre 0 y la duración (si se conoce).
         target = max(0, target)
@@ -217,6 +204,7 @@ struct PlayerScreen: View {
     }
 
     private func endScrub() {
+        guard isScrubbing else { return }
         isScrubbing = false
         requestSeek(to: scrubTargetSeconds)
         if wasPlayingBeforeScrub {
