@@ -62,7 +62,8 @@ Comandos útiles:
 
 ## Estado actual
 - Sesión 3 VALIDADA en el iPhone (2026-10-20): Daniel probó la v0.5.0 y dijo que "funciona muy bien" (velocidad, lista, panel reposicionable, Liquid Glass).
-- Ajuste posterior: **v0.5.1 (build 6)**, commit `f847b10`, run 39481395603 en verde — se agregaron velocidades lentas 0.25 / 0.4 / 0.7 / 0.8. El `.ipa` ya está descargado en `C:\dev\d_video_player\DVideoPlayer.ipa`, listo para iLoader. Pendiente solo confirmar la v0.5.1 instalada.
+- **v0.5.1 (build 6) VALIDADA en el iPhone (2026-10-20)**: Daniel la instaló y confirmó que funciona perfecto (velocidades lentas 0.25 / 0.4 / 0.7 / 0.8 incluidas). Commit `f847b10`, run 39481395603.
+- No hay pendientes; próximas ideas en "Pendientes posibles" del plan.
 
 ## Problemas conocidos
 - Los archivos de `.github/workflows` están protegidos para las herramientas remotas: el asistente no puede escribirlos. Si hay que cambiar el workflow, dejar el archivo en una carpeta temporal y pedirle a Daniel que lo mueva a `.github\workflows\`.
