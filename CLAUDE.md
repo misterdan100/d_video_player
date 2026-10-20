@@ -47,6 +47,8 @@ Comandos útiles:
   - **Liquid Glass**: modificador propio `liquidGlass(in:interactive:)` que usa `.glassEffect(.regular/.regular.interactive(), in:)` bajo `#available(iOS 26.0, *)` y cae a fondo negro translúcido en iOS < 26. Aplicado al panel y al indicador de scrub. El resto de la UI (lista, botones) toma el look nuevo automáticamente al compilar con el SDK de Xcode 27.
   - **Lista de videos**: la pantalla inicial es un `NavigationStack` con `List` de los MP4/M4V/MOV en Documents (la carpeta "D Video Player" de Archivos), con nombre, tamaño y fecha; tocar = reproducir (sin security scope). Pull-to-refresh, estado vacío con instrucciones (`ContentUnavailableView`), botón de carpeta en la toolbar para abrir de otra ubicación con `.fileImporter`, y la versión abajo.
 
+- **Icono (v0.6.0)**: monograma "D" cuya contraforma es un triángulo de play, sobre fondo degradado violeta→azul noche con brillos, y debajo una barra de scrub con progreso coral→ámbar y perilla luminosa (alude al gesto de arrastrar). Tres variantes en `Sources/Assets.xcassets/AppIcon.appiconset` (formato de tamaño único 1024): clara (RGB sin alfa), oscura (fondo transparente, D lavanda) y tintada (escala de grises, transparente). `ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon` en `project.yml`. Se genera con `tools/make_icon.py` (SVG renderizado con Playwright + Pillow); para retocarlo, editar el SVG ahí y regenerar.
+
 ## Estructura del código (Sources/)
 - `DVideoPlayerApp.swift` — entry point.
 - `ContentView.swift` — biblioteca: lista de videos de Documents (`VideoLibrary.scan()`, struct `VideoFile`), estado vacío, `.fileImporter` para otras carpetas, alerta de error, texto de versión; `VideoSelection` maneja el acceso security-scoped.
@@ -63,7 +65,8 @@ Comandos útiles:
 ## Estado actual
 - Sesión 3 VALIDADA en el iPhone (2026-10-20): Daniel probó la v0.5.0 y dijo que "funciona muy bien" (velocidad, lista, panel reposicionable, Liquid Glass).
 - **v0.5.1 (build 6) VALIDADA en el iPhone (2026-10-20)**: Daniel la instaló y confirmó que funciona perfecto (velocidades lentas 0.25 / 0.4 / 0.7 / 0.8 incluidas). Commit `f847b10`, run 39481395603.
-- No hay pendientes; próximas ideas en "Pendientes posibles" del plan.
+- **v0.6.0 (build 7)** — icono de la app. Commit `b7c78a5`, run 39485976496 en verde; verificado que el `.ipa` trae `Assets.car`, `AppIcon60x60@2x.png` y `CFBundleIcons`. El `.ipa` ya está en la carpeta del repo. PENDIENTE: que Daniel confirme cómo se ve en el iPhone (si iOS muestra el icono viejo/en blanco, reiniciar el iPhone limpia la caché de iconos).
+- Próximas ideas en "Pendientes posibles" del plan.
 
 ## Problemas conocidos
 - Los archivos de `.github/workflows` están protegidos para las herramientas remotas: el asistente no puede escribirlos. Si hay que cambiar el workflow, dejar el archivo en una carpeta temporal y pedirle a Daniel que lo mueva a `.github\workflows\`.
