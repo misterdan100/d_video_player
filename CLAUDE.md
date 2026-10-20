@@ -33,18 +33,27 @@ Comandos útiles:
 - Swift language mode 5.0 (evita errores de concurrencia estricta). Deployment target iOS 18.0.
 - Bundle ID: `com.misterdan100.dvideoplayer`. Sin entitlements (cuenta gratuita).
 - `UIFileSharingEnabled` activo: la carpeta de la app aparece en Archivos para copiar videos.
+- Sesión 1: el video se abre con `.fileImporter` (security-scoped URL), se reproduce con `AVPlayerLayer` propio (sin `AVPlayerViewController`) para controlar los gestos. Audio con categoría `.playback` (suena aunque el iPhone esté en silencio). Al terminar el video: vuelve al inicio en pausa.
+
+## Estructura del código (Sources/)
+- `DVideoPlayerApp.swift` — entry point.
+- `ContentView.swift` — pantalla inicial, botón "Abrir video" + `.fileImporter`; `VideoSelection` maneja el acceso security-scoped.
+- `PlayerScreen.swift` — pantalla de reproducción: tap = play/pause con ícono de confirmación, tiempo actual/duración, botón cerrar, `isIdleTimerDisabled`.
+- `VideoLayerView.swift` — `UIViewRepresentable` con `AVPlayerLayer`.
 
 ## Plan por sesiones
 - [x] **Sesión 0** — Pipeline: repo, XcodeGen, workflow, app "Hola mundo" instalada en el iPhone.
-- [ ] **Sesión 1** — Reproductor base: abrir video desde Archivos, `AVPlayer` + `AVPlayerLayer` en SwiftUI, pantalla siempre encendida, tap = play/pause.
+- [x] **Sesión 1** — Reproductor base: abrir video desde Archivos, `AVPlayer` + `AVPlayerLayer` en SwiftUI, pantalla siempre encendida, tap = play/pause.
 - [ ] **Sesión 2** — Gesto de scrub: mantener + arrastrar horizontal, indicador de tiempo en pantalla, sensibilidad, modo horizontal.
 - [ ] **Sesión 3** (opcional) — Recordar posición, velocidad, lista de videos, imagen en imagen.
 
 ## Estado actual
-- Sesión 0 COMPLETA (2026-10-20): el pipeline funciona de punta a punta. Repo: https://github.com/misterdan100/d_video_player. La compilación tarda ~47 s en el runner `xcode-27` (Xcode 27.2 beta 2, SDK iphoneos27.2) y la app "Hola mundo" ya está instalada y abre en el iPhone mostrando versión, build y versión de iOS.
-- Siguiente: Sesión 1 (reproductor base).
+- Sesión 1 COMPLETA (2026-10-20): reproductor base compilado y publicado (v0.2.0, build 2). Commit `ee5e831`, run 39465328122 en verde (~40 s). El `.ipa` nuevo ya está en el Release `latest`.
+- Falta validar en el iPhone: Daniel debe instalar el nuevo `.ipa` (iLoader o SideStore) y probar con su MP4 desde Archivos: que reproduzca, que el tap haga play/pause y que la pantalla no se apague.
+- Siguiente: Sesión 2 (gesto de scrub).
 
 ## Problemas conocidos
 - Los archivos de `.github/workflows` están protegidos para las herramientas remotas: el asistente no puede escribirlos. Si hay que cambiar el workflow, dejar el archivo en una carpeta temporal y pedirle a Daniel que lo mueva a `.github\workflows\`.
 - El script del workflow elige la Xcode más reciente instalada (hoy una beta). Si una beta da problemas, fijarlo a la versión estable.
 - iLoader falló al iniciar sesión con el Apple ID (error 502 del servidor anisette `new.ani.sidestore.io`, caído temporalmente). Si se repite: esperar, o instalar el .ipa desde el iPhone con SideStore.
+- GitHub Actions avisa que `actions/checkout@v4` y `upload-artifact@v4` usan Node 20 (deprecado); no bloquea nada, pero en algún momento conviene subirlas a v5.
