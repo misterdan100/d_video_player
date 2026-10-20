@@ -25,9 +25,10 @@ Funciones obligatorias:
 
 Comandos útiles:
 - Lanzar compilación manual: `gh workflow run build-ipa.yml`
-- Ver estado: `gh run list --limit 5` / `gh run watch`
+- Ver estado: `gh run list --limit 5` / `gh run view <id> --json status,conclusion`
 - Ver errores: `gh run view --log-failed`
 - Descargar el .ipa: `gh release download latest -p DVideoPlayer.ipa --clobber`
+- Ojo desde Cowork: el puente al PC corta las respuestas a los ~60 s; en vez de `gh run watch`, sondear con `gh run view` en llamadas cortas (con `Start-Sleep` de ≤40 s).
 
 ## Decisiones
 - Swift + SwiftUI, `AVPlayer` nativo (MP4/H.264/HEVC). Sin librerías de terceros para evitar fallos de compilación remota.
@@ -39,27 +40,34 @@ Comandos útiles:
 - Sesión 2 (implementación): los gestos viven en `VideoLayerView` con reconocedores **UIKit** (`UITapGestureRecognizer` + `UILongPressGestureRecognizer` de 0.3 s) — el primer intento con `LongPressGesture.sequenced(DragGesture)` de SwiftUI NO se activaba en el iPhone. El arrastre se reporta como fracción del ancho de la vista (rotación OK). Al activarse hay háptica y se pausa el video; al soltar reanuda si estaba reproduciendo. Seek con tolerancia cero y cola de 1 pendiente (`requestSeek`/`performNextSeek`) para no saturar `AVPlayer`. Indicador en pantalla: tiempo destino grande + delta (±). Se clampa entre 0 y duración−0.1 s.
 - Los controles (X y tiempo) respetan el safe area: antes la X quedaba debajo del Dynamic Island y no recibía toques.
 - La pantalla inicial muestra la versión instalada (`CFBundleShortVersionString` + `CFBundleVersion`, declarados explícitos en el Info.plist generado) para verificar qué build corre.
+- Sesión 3 (elecciones de Daniel): velocidad de reproducción, lista de videos, **panel de controles reposicionable** (arriba o lateral, porque a veces mira videos con un piano en la parte inferior) y estilo **Liquid Glass** de iOS 26/27.
+- Sesión 3 (implementación):
+  - **Velocidad**: menú en el panel con 0.5 / 0.75 / 1 / 1.25 / 1.5 / 2×. Se usa `player.defaultRate` (iOS 16+), así `play()` siempre reanuda a la velocidad elegida (tras pausa o scrub). Persistida en `@AppStorage("playbackSpeed")`.
+  - **Panel reposicionable**: enum `PanelPosition` (top/bottom/leading/trailing), persistida en `@AppStorage("panelPosition")`, por defecto **arriba**. El panel es una cápsula con X, tiempo, velocidad y un menú de posición (ícono de flechas); en los laterales se vuelve vertical (`AnyLayout`) y el tiempo se apila. Durante el scrub el panel se atenúa (opacity 0.25).
+  - **Liquid Glass**: modificador propio `liquidGlass(in:interactive:)` que usa `.glassEffect(.regular/.regular.interactive(), in:)` bajo `#available(iOS 26.0, *)` y cae a fondo negro translúcido en iOS < 26. Aplicado al panel y al indicador de scrub. El resto de la UI (lista, botones) toma el look nuevo automáticamente al compilar con el SDK de Xcode 27.
+  - **Lista de videos**: la pantalla inicial es un `NavigationStack` con `List` de los MP4/M4V/MOV en Documents (la carpeta "D Video Player" de Archivos), con nombre, tamaño y fecha; tocar = reproducir (sin security scope). Pull-to-refresh, estado vacío con instrucciones (`ContentUnavailableView`), botón de carpeta en la toolbar para abrir de otra ubicación con `.fileImporter`, y la versión abajo.
 
 ## Estructura del código (Sources/)
 - `DVideoPlayerApp.swift` — entry point.
-- `ContentView.swift` — pantalla inicial, botón "Abrir video" + `.fileImporter`, texto de versión instalada; `VideoSelection` maneja el acceso security-scoped.
-- `PlayerScreen.swift` — pantalla de reproducción: lógica de play/pause y scrub, indicador de tiempo, botón cerrar (dentro del safe area), `isIdleTimerDisabled`.
+- `ContentView.swift` — biblioteca: lista de videos de Documents (`VideoLibrary.scan()`, struct `VideoFile`), estado vacío, `.fileImporter` para otras carpetas, alerta de error, texto de versión; `VideoSelection` maneja el acceso security-scoped.
+- `PlayerScreen.swift` — pantalla de reproducción: play/pause, scrub, velocidad (`defaultRate`), panel reposicionable (`PanelPosition`), indicador de tiempo, `isIdleTimerDisabled`, helper `liquidGlass`.
 - `VideoLayerView.swift` — `UIViewRepresentable` con `AVPlayerLayer` + gestos UIKit (tap y mantener+arrastrar) que reporta por callbacks a `PlayerScreen`.
 
 ## Plan por sesiones
 - [x] **Sesión 0** — Pipeline: repo, XcodeGen, workflow, app "Hola mundo" instalada en el iPhone.
 - [x] **Sesión 1** — Reproductor base: abrir video desde Archivos, `AVPlayer` + `AVPlayerLayer` en SwiftUI, pantalla siempre encendida, tap = play/pause.
 - [x] **Sesión 2** — Gesto de scrub: mantener + arrastrar horizontal, indicador de tiempo en pantalla, sensibilidad, modo horizontal.
-- [ ] **Sesión 3** (opcional) — Recordar posición, velocidad, lista de videos, imagen en imagen.
+- [x] **Sesión 3** — Velocidad de reproducción, lista de videos, panel reposicionable (arriba/abajo/laterales), Liquid Glass.
+- [ ] **Pendientes posibles** — Recordar posición por video, imagen en imagen (PiP; ojo: con cuenta gratuita el background puede no funcionar), borrar videos desde la lista.
 
 ## Estado actual
-- Sesión 2 COMPLETA Y VALIDADA en el iPhone (2026-10-20): Daniel instaló la **v0.4.0 (build 4)** y confirmó que todo funciona perfecto (scrub, X, versión visible). Commit `82c11d2`, run 39477511114 en verde.
-- Historia de la corrección: el primer intento de scrub con `LongPressGesture.sequenced(DragGesture)` de SwiftUI no se activaba en el dispositivo, y la X quedaba bajo el Dynamic Island; se resolvió con gestos UIKit y controles dentro del safe area.
-- Las 3 funciones obligatorias del proyecto están cumplidas y validadas.
-- Siguiente: Sesión 3 (opcional) — recordar posición, velocidad, lista de videos, imagen en imagen.
+- Sesión 3 COMPILADA (2026-10-20): **v0.5.0 (build 5)**, commit `057a0fb`, run 39479805465 en verde. El `.ipa` ya está descargado en `C:\dev\d_video_player\DVideoPlayer.ipa`, listo para iLoader.
+- **PENDIENTE DE VALIDAR en el iPhone**: velocidad (y que se mantenga tras pausa/scrub), lista de videos en Documents, mover el panel a los 4 bordes (vertical en laterales), aspecto Liquid Glass, y que tap/scrub sigan funcionando igual.
+- Sesión 2 validada antes: v0.4.0 (build 4), todo perfecto.
 
 ## Problemas conocidos
 - Los archivos de `.github/workflows` están protegidos para las herramientas remotas: el asistente no puede escribirlos. Si hay que cambiar el workflow, dejar el archivo en una carpeta temporal y pedirle a Daniel que lo mueva a `.github\workflows\`.
 - El script del workflow elige la Xcode más reciente instalada (hoy una beta). Si una beta da problemas, fijarlo a la versión estable.
 - iLoader falló al iniciar sesión con el Apple ID (error 502 del servidor anisette `new.ani.sidestore.io`, caído temporalmente). Si se repite: esperar, o instalar el .ipa desde el iPhone con SideStore.
 - GitHub Actions avisa que `actions/checkout@v4` y `upload-artifact@v4` usan Node 20 (deprecado); no bloquea nada, pero en algún momento conviene subirlas a v5.
+- `gh run watch` desde Cowork se corta a los ~60 s (límite del puente al PC); usar sondeos cortos con `gh run view`.
