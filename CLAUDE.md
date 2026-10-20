@@ -53,10 +53,10 @@ Comandos útiles:
 - [ ] **Sesión 3** (opcional) — Recordar posición, velocidad, lista de videos, imagen en imagen.
 
 ## Estado actual
-- Sesión 2 corregida (2026-10-20): Daniel probó en el iPhone y ni el scrub ni la X funcionaban. Se reescribió el gesto con UIKit, se movieron los controles al safe area y se agregó el texto de versión. **v0.4.0 (build 4)**, commit `82c11d2`, run 39477511114 en verde (~58 s). El `.ipa` nuevo ya está en el Release `latest`.
-- Falta validar en el iPhone con v0.4.0: que la pantalla inicial diga "v0.4.0 (build 4)", reproducción, tap = play/pause, pantalla siempre encendida, la X cierra, y el scrub (mantener 0.3 s + arrastrar: háptica, indicador de tiempo, seek en vivo, reanudar al soltar, también en horizontal). Si la sensibilidad de 90 s/pantalla no le gusta, ajustar `secondsPerFullWidth`.
-- Nota: el problema del scrub pudo ser también de instalación (no sabemos qué versión probó); con el texto de versión ya se puede verificar.
-- Siguiente: validación en el iPhone y, si todo bien, Sesión 3 (opcional).
+- Sesión 2 COMPLETA Y VALIDADA en el iPhone (2026-10-20): Daniel instaló la **v0.4.0 (build 4)** y confirmó que todo funciona perfecto (scrub, X, versión visible). Commit `82c11d2`, run 39477511114 en verde.
+- Historia de la corrección: el primer intento de scrub con `LongPressGesture.sequenced(DragGesture)` de SwiftUI no se activaba en el dispositivo, y la X quedaba bajo el Dynamic Island; se resolvió con gestos UIKit y controles dentro del safe area.
+- Las 3 funciones obligatorias del proyecto están cumplidas y validadas.
+- Siguiente: Sesión 3 (opcional) — recordar posición, velocidad, lista de videos, imagen en imagen.
 
 ## Problemas conocidos
 - Los archivos de `.github/workflows` están protegidos para las herramientas remotas: el asistente no puede escribirlos. Si hay que cambiar el workflow, dejar el archivo en una carpeta temporal y pedirle a Daniel que lo mueva a `.github\workflows\`.
