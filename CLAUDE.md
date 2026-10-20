@@ -34,23 +34,25 @@ Comandos útiles:
 - Bundle ID: `com.misterdan100.dvideoplayer`. Sin entitlements (cuenta gratuita).
 - `UIFileSharingEnabled` activo: la carpeta de la app aparece en Archivos para copiar videos.
 - Sesión 1: el video se abre con `.fileImporter` (security-scoped URL), se reproduce con `AVPlayerLayer` propio (sin `AVPlayerViewController`) para controlar los gestos. Audio con categoría `.playback` (suena aunque el iPhone esté en silencio). Al terminar el video: vuelve al inicio en pausa.
+- Sesión 2 (elecciones de Daniel): scrub con **seek en vivo** (el video salta mientras se arrastra) y **sensibilidad fija** (ancho completo de pantalla ≈ 90 s; constante `secondsPerFullWidth` en `PlayerScreen.swift`).
+- Sesión 2 (implementación): `LongPressGesture(0.3 s).sequenced(before: DragGesture)`; al activarse hay háptica (`UIImpactFeedbackGenerator`) y se pausa el video; al soltar reanuda si estaba reproduciendo. Seek con tolerancia cero y cola de 1 pendiente (`requestSeek`/`performNextSeek`) para no saturar `AVPlayer`. Indicador en pantalla: tiempo destino grande + delta (±). Se clampa entre 0 y duración−0.1 s. El ancho se toma de `GeometryReader` (se actualiza al rotar; el modo horizontal ya estaba habilitado en `project.yml`).
 
 ## Estructura del código (Sources/)
 - `DVideoPlayerApp.swift` — entry point.
 - `ContentView.swift` — pantalla inicial, botón "Abrir video" + `.fileImporter`; `VideoSelection` maneja el acceso security-scoped.
-- `PlayerScreen.swift` — pantalla de reproducción: tap = play/pause con ícono de confirmación, tiempo actual/duración, botón cerrar, `isIdleTimerDisabled`.
+- `PlayerScreen.swift` — pantalla de reproducción: tap = play/pause con ícono de confirmación, scrub (mantener + arrastrar), tiempo actual/duración, botón cerrar, `isIdleTimerDisabled`.
 - `VideoLayerView.swift` — `UIViewRepresentable` con `AVPlayerLayer`.
 
 ## Plan por sesiones
 - [x] **Sesión 0** — Pipeline: repo, XcodeGen, workflow, app "Hola mundo" instalada en el iPhone.
 - [x] **Sesión 1** — Reproductor base: abrir video desde Archivos, `AVPlayer` + `AVPlayerLayer` en SwiftUI, pantalla siempre encendida, tap = play/pause.
-- [ ] **Sesión 2** — Gesto de scrub: mantener + arrastrar horizontal, indicador de tiempo en pantalla, sensibilidad, modo horizontal.
+- [x] **Sesión 2** — Gesto de scrub: mantener + arrastrar horizontal, indicador de tiempo en pantalla, sensibilidad, modo horizontal.
 - [ ] **Sesión 3** (opcional) — Recordar posición, velocidad, lista de videos, imagen en imagen.
 
 ## Estado actual
-- Sesión 1 COMPLETA (2026-10-20): reproductor base compilado y publicado (v0.2.0, build 2). Commit `ee5e831`, run 39465328122 en verde (~40 s). El `.ipa` nuevo ya está en el Release `latest`.
-- Falta validar en el iPhone: Daniel debe instalar el nuevo `.ipa` (iLoader o SideStore) y probar con su MP4 desde Archivos: que reproduzca, que el tap haga play/pause y que la pantalla no se apague.
-- Siguiente: Sesión 2 (gesto de scrub).
+- Sesión 2 COMPLETA (2026-10-20): gesto de scrub compilado y publicado (v0.3.0, build 3). Commit `0719b3a`, run 39474236157 en verde (~36 s). El `.ipa` nuevo ya está en el Release `latest`.
+- Falta validar en el iPhone (acumulado de Sesiones 1 y 2): instalar el `.ipa` nuevo (iLoader o SideStore) y probar con un MP4 desde Archivos: reproducción, tap = play/pause, pantalla siempre encendida, y el scrub (mantener 0.3 s + arrastrar: háptica, indicador de tiempo, seek en vivo, reanudar al soltar, también en horizontal). Si la sensibilidad de 90 s/pantalla no le gusta, ajustar `secondsPerFullWidth`.
+- Siguiente: validación en el iPhone y, si todo bien, Sesión 3 (opcional).
 
 ## Problemas conocidos
 - Los archivos de `.github/workflows` están protegidos para las herramientas remotas: el asistente no puede escribirlos. Si hay que cambiar el workflow, dejar el archivo en una carpeta temporal y pedirle a Daniel que lo mueva a `.github\workflows\`.
