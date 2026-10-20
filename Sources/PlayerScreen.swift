@@ -38,8 +38,8 @@ struct PlayerScreen: View {
     /// Sensibilidad fija: arrastrar todo el ancho de la pantalla ≈ 90 segundos.
     private let secondsPerFullWidth: Double = 90
 
-    /// Velocidades disponibles en el menú.
-    private let speeds: [Double] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
+    /// Velocidades disponibles en el menú (lentas pedidas por Daniel: 0.25–0.8).
+    private let speeds: [Double] = [0.25, 0.4, 0.5, 0.7, 0.8, 1.0, 1.25, 1.5, 2.0]
 
     init(video: VideoSelection, onClose: @escaping () -> Void) {
         self.video = video
