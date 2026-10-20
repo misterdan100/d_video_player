@@ -21,6 +21,7 @@ Funciones obligatorias:
 2. `git push` a `main` dispara `.github/workflows/build-ipa.yml` en un runner `xcode-27` (Xcode 27, Apple Silicon).
 3. El workflow genera el proyecto con **XcodeGen** (`project.yml`; el `.xcodeproj` NO se versiona), compila **sin firmar** y publica `DVideoPlayer.ipa` en el Release `latest` y como artefacto.
 4. El `.ipa` se firma e instala en el iPhone con iLoader (desde el PC) o SideStore (desde el iPhone).
+5. **Regla fija (pedida por Daniel)**: después de cada build en verde, el asistente descarga el `.ipa` a la carpeta del repo (`gh release download latest -p DVideoPlayer.ipa --clobber` en `C:\dev\d_video_player`), para que quede listo para iLoader sin pasos manuales.
 
 Comandos útiles:
 - Lanzar compilación manual: `gh workflow run build-ipa.yml`
@@ -52,8 +53,9 @@ Comandos útiles:
 - [ ] **Sesión 3** (opcional) — Recordar posición, velocidad, lista de videos, imagen en imagen.
 
 ## Estado actual
-- Sesión 2 COMPLETA (2026-10-20): gesto de scrub compilado y publicado (v0.3.0, build 3). Commit `0719b3a`, run 39474236157 en verde (~36 s). El `.ipa` nuevo ya está en el Release `latest`.
-- Falta validar en el iPhone (acumulado de Sesiones 1 y 2): instalar el `.ipa` nuevo (iLoader o SideStore) y probar con un MP4 desde Archivos: reproducción, tap = play/pause, pantalla siempre encendida, y el scrub (mantener 0.3 s + arrastrar: háptica, indicador de tiempo, seek en vivo, reanudar al soltar, también en horizontal). Si la sensibilidad de 90 s/pantalla no le gusta, ajustar `secondsPerFullWidth`.
+- Sesión 2 corregida (2026-10-20): Daniel probó en el iPhone y ni el scrub ni la X funcionaban. Se reescribió el gesto con UIKit, se movieron los controles al safe area y se agregó el texto de versión. **v0.4.0 (build 4)**, commit `82c11d2`, run 39477511114 en verde (~58 s). El `.ipa` nuevo ya está en el Release `latest`.
+- Falta validar en el iPhone con v0.4.0: que la pantalla inicial diga "v0.4.0 (build 4)", reproducción, tap = play/pause, pantalla siempre encendida, la X cierra, y el scrub (mantener 0.3 s + arrastrar: háptica, indicador de tiempo, seek en vivo, reanudar al soltar, también en horizontal). Si la sensibilidad de 90 s/pantalla no le gusta, ajustar `secondsPerFullWidth`.
+- Nota: el problema del scrub pudo ser también de instalación (no sabemos qué versión probó); con el texto de versión ya se puede verificar.
 - Siguiente: validación en el iPhone y, si todo bien, Sesión 3 (opcional).
 
 ## Problemas conocidos
