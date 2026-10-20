@@ -35,13 +35,15 @@ Comandos útiles:
 - `UIFileSharingEnabled` activo: la carpeta de la app aparece en Archivos para copiar videos.
 - Sesión 1: el video se abre con `.fileImporter` (security-scoped URL), se reproduce con `AVPlayerLayer` propio (sin `AVPlayerViewController`) para controlar los gestos. Audio con categoría `.playback` (suena aunque el iPhone esté en silencio). Al terminar el video: vuelve al inicio en pausa.
 - Sesión 2 (elecciones de Daniel): scrub con **seek en vivo** (el video salta mientras se arrastra) y **sensibilidad fija** (ancho completo de pantalla ≈ 90 s; constante `secondsPerFullWidth` en `PlayerScreen.swift`).
-- Sesión 2 (implementación): `LongPressGesture(0.3 s).sequenced(before: DragGesture)`; al activarse hay háptica (`UIImpactFeedbackGenerator`) y se pausa el video; al soltar reanuda si estaba reproduciendo. Seek con tolerancia cero y cola de 1 pendiente (`requestSeek`/`performNextSeek`) para no saturar `AVPlayer`. Indicador en pantalla: tiempo destino grande + delta (±). Se clampa entre 0 y duración−0.1 s. El ancho se toma de `GeometryReader` (se actualiza al rotar; el modo horizontal ya estaba habilitado en `project.yml`).
+- Sesión 2 (implementación): los gestos viven en `VideoLayerView` con reconocedores **UIKit** (`UITapGestureRecognizer` + `UILongPressGestureRecognizer` de 0.3 s) — el primer intento con `LongPressGesture.sequenced(DragGesture)` de SwiftUI NO se activaba en el iPhone. El arrastre se reporta como fracción del ancho de la vista (rotación OK). Al activarse hay háptica y se pausa el video; al soltar reanuda si estaba reproduciendo. Seek con tolerancia cero y cola de 1 pendiente (`requestSeek`/`performNextSeek`) para no saturar `AVPlayer`. Indicador en pantalla: tiempo destino grande + delta (±). Se clampa entre 0 y duración−0.1 s.
+- Los controles (X y tiempo) respetan el safe area: antes la X quedaba debajo del Dynamic Island y no recibía toques.
+- La pantalla inicial muestra la versión instalada (`CFBundleShortVersionString` + `CFBundleVersion`, declarados explícitos en el Info.plist generado) para verificar qué build corre.
 
 ## Estructura del código (Sources/)
 - `DVideoPlayerApp.swift` — entry point.
-- `ContentView.swift` — pantalla inicial, botón "Abrir video" + `.fileImporter`; `VideoSelection` maneja el acceso security-scoped.
-- `PlayerScreen.swift` — pantalla de reproducción: tap = play/pause con ícono de confirmación, scrub (mantener + arrastrar), tiempo actual/duración, botón cerrar, `isIdleTimerDisabled`.
-- `VideoLayerView.swift` — `UIViewRepresentable` con `AVPlayerLayer`.
+- `ContentView.swift` — pantalla inicial, botón "Abrir video" + `.fileImporter`, texto de versión instalada; `VideoSelection` maneja el acceso security-scoped.
+- `PlayerScreen.swift` — pantalla de reproducción: lógica de play/pause y scrub, indicador de tiempo, botón cerrar (dentro del safe area), `isIdleTimerDisabled`.
+- `VideoLayerView.swift` — `UIViewRepresentable` con `AVPlayerLayer` + gestos UIKit (tap y mantener+arrastrar) que reporta por callbacks a `PlayerScreen`.
 
 ## Plan por sesiones
 - [x] **Sesión 0** — Pipeline: repo, XcodeGen, workflow, app "Hola mundo" instalada en el iPhone.
