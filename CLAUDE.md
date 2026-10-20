@@ -35,10 +35,16 @@ Comandos útiles:
 - `UIFileSharingEnabled` activo: la carpeta de la app aparece en Archivos para copiar videos.
 
 ## Plan por sesiones
-- [ ] **Sesión 0** — Pipeline: repo, XcodeGen, workflow, app "Hola mundo" instalada en el iPhone.
+- [x] **Sesión 0** — Pipeline: repo, XcodeGen, workflow, app "Hola mundo" instalada en el iPhone.
 - [ ] **Sesión 1** — Reproductor base: abrir video desde Archivos, `AVPlayer` + `AVPlayerLayer` en SwiftUI, pantalla siempre encendida, tap = play/pause.
 - [ ] **Sesión 2** — Gesto de scrub: mantener + arrastrar horizontal, indicador de tiempo en pantalla, sensibilidad, modo horizontal.
 - [ ] **Sesión 3** (opcional) — Recordar posición, velocidad, lista de videos, imagen en imagen.
 
 ## Estado actual
-Sesión 0 en curso. Actualizar aquí al terminar cada sesión.
+- Sesión 0 COMPLETA (2026-10-20): el pipeline funciona de punta a punta. Repo: https://github.com/misterdan100/d_video_player. La compilación tarda ~47 s en el runner `xcode-27` (Xcode 27.2 beta 2, SDK iphoneos27.2) y la app "Hola mundo" ya está instalada y abre en el iPhone mostrando versión, build y versión de iOS.
+- Siguiente: Sesión 1 (reproductor base).
+
+## Problemas conocidos
+- Los archivos de `.github/workflows` están protegidos para las herramientas remotas: el asistente no puede escribirlos. Si hay que cambiar el workflow, dejar el archivo en una carpeta temporal y pedirle a Daniel que lo mueva a `.github\workflows\`.
+- El script del workflow elige la Xcode más reciente instalada (hoy una beta). Si una beta da problemas, fijarlo a la versión estable.
+- iLoader falló al iniciar sesión con el Apple ID (error 502 del servidor anisette `new.ani.sidestore.io`, caído temporalmente). Si se repite: esperar, o instalar el .ipa desde el iPhone con SideStore.
