@@ -5,8 +5,12 @@ import UIKit
 /// Pantalla de reproducción.
 /// - Un toque = play/pause (con ícono de confirmación que se desvanece).
 /// - Mantener presionado (0.3 s) + arrastrar horizontal = scrub con seek en vivo.
-/// - Panel de controles (X, tiempo, velocidad) reposicionable: arriba, abajo,
-///   izquierda o derecha (para videos con contenido abajo, p. ej. piano).
+/// - Pellizco (2 dedos) = zoom como a una foto; arrastre con 2 dedos = mover.
+///   El zoom se mantiene hasta elegir un modo en el menú de zoom del panel.
+/// - Menú de zoom: Normal (1×), Llenar bordes (sin deformar) y Estirar
+///   (a las proporciones de la pantalla). Siempre abre en Normal.
+/// - Panel de controles (X, tiempo, velocidad, zoom, posición) reposicionable:
+///   arriba, abajo, izquierda o derecha (para videos con contenido abajo).
 /// - Estilo Liquid Glass en iOS 26+ con fallback a fondo oscuro.
 /// - La pantalla no se apaga mientras esta vista está activa.
 /// Los gestos viven en VideoLayerView (UIKit); los controles respetan el safe area.
@@ -22,10 +26,17 @@ struct PlayerScreen: View {
     @State private var timeObserver: Any?
 
     // MARK: Preferencias persistentes
-    /// Velocidad de reproducción (0.5–2.0), recordada entre sesiones.
+    /// Velocidad de reproducción (0.25–2.0), recordada entre sesiones.
     @AppStorage("playbackSpeed") private var playbackSpeed: Double = 1.0
     /// Posición del panel de controles, recordada entre sesiones.
     @AppStorage("panelPosition") private var panelPositionRaw: String = PanelPosition.top.rawValue
+
+    // MARK: Estado del zoom (por video; cada video abre en Normal)
+    /// Modo de escala: normal (aspect fit), llenar bordes (aspect fill)
+    /// o estirar a la pantalla (resize).
+    @State private var scaleMode: VideoScaleMode = .fit
+    /// Incrementarlo reinicia el zoom de pellizco a 1× (animado).
+    @State private var zoomResetToken = 0
 
     // MARK: Estado del scrub
     @State private var isScrubbing = false
@@ -59,6 +70,8 @@ struct PlayerScreen: View {
             // El video (y sus gestos) ocupa toda la pantalla.
             VideoLayerView(
                 player: player,
+                videoGravity: scaleMode.gravity,
+                zoomResetToken: zoomResetToken,
                 onTap: { togglePlayPause() },
                 onScrubBegan: { beginScrub() },
                 onScrubMoved: { fraction in updateScrub(widthFraction: fraction) },
@@ -123,6 +136,8 @@ struct PlayerScreen: View {
 
             speedMenu
 
+            zoomMenu
+
             positionMenu
         }
         .padding(.vertical, panelPosition.isVertical ? 14 : 8)
@@ -166,6 +181,30 @@ struct PlayerScreen: View {
                 .font(.subheadline.bold().monospacedDigit())
                 .foregroundStyle(.white)
                 .frame(minWidth: 44, minHeight: 34)
+                .contentShape(Rectangle())
+        }
+    }
+
+    /// Menú de zoom: volver a normal, llenar bordes o estirar a la pantalla.
+    /// Elegir cualquier opción también quita el zoom de pellizco.
+    private var zoomMenu: some View {
+        Menu {
+            ForEach(VideoScaleMode.allCases, id: \.rawValue) { mode in
+                Button {
+                    setScaleMode(mode)
+                } label: {
+                    if mode == scaleMode {
+                        Label(mode.title, systemImage: "checkmark")
+                    } else {
+                        Label(mode.title, systemImage: mode.icon)
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "aspectratio")
+                .font(.headline)
+                .foregroundStyle(.white)
+                .frame(width: 34, height: 34)
                 .contentShape(Rectangle())
         }
     }
@@ -276,6 +315,13 @@ struct PlayerScreen: View {
         showFeedback("gauge.with.needle")
     }
 
+    /// Cambia el modo de escala y quita el zoom de pellizco.
+    private func setScaleMode(_ mode: VideoScaleMode) {
+        scaleMode = mode
+        zoomResetToken += 1
+        showFeedback(mode.icon)
+    }
+
     // MARK: - Scrub (requisito 3)
 
     private func beginScrub() {
@@ -369,6 +415,43 @@ struct PlayerScreen: View {
             return "\(Int(speed))×"
         }
         return "\(speed.formatted())×"
+    }
+}
+
+// MARK: - Modo de escala del video
+
+/// Cómo se acomoda el video en la pantalla.
+/// El zoom de pellizco se aplica encima del modo elegido.
+enum VideoScaleMode: String, CaseIterable {
+    /// Tamaño normal: el video completo, con barras si hace falta.
+    case fit
+    /// Llenar los bordes sin deformar: recorta lo que sobre.
+    case fill
+    /// Estirar a las proporciones de la pantalla (deforma el video).
+    case stretch
+
+    var title: String {
+        switch self {
+        case .fit: return "Normal"
+        case .fill: return "Llenar bordes"
+        case .stretch: return "Estirar a pantalla"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .fit: return "rectangle.arrowtriangle.2.inward"
+        case .fill: return "rectangle.arrowtriangle.2.outward"
+        case .stretch: return "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left"
+        }
+    }
+
+    var gravity: AVLayerVideoGravity {
+        switch self {
+        case .fit: return .resizeAspect
+        case .fill: return .resizeAspectFill
+        case .stretch: return .resize
+        }
     }
 }
 
