@@ -18,7 +18,7 @@ Funciones obligatorias:
 
 ## Arquitectura de compilación (no hay Xcode local)
 1. Se edita el código en `C:\dev\d_video_player`.
-2. `git push` a `main` dispara `.github/workflows/build-ipa.yml` en un runner `xcode-27` (Xcode 27, Apple Silicon).
+2. `git push` a `main` dispara `.github/workflows/build-ipa.yml` en un runner `xcode-27` (Xcode 27, Apple Silicon). Los cambios solo de `.md` NO disparan build (`paths-ignore`).
 3. El workflow genera el proyecto con **XcodeGen** (`project.yml`; el `.xcodeproj` NO se versiona), compila **sin firmar** y publica `DVideoPlayer.ipa` en el Release `latest` y como artefacto.
 4. El `.ipa` se firma e instala en el iPhone con iLoader (desde el PC) o SideStore (desde el iPhone).
 5. **Regla fija (pedida por Daniel)**: después de cada build en verde, el asistente descarga el `.ipa` a la carpeta del repo (`gh release download latest -p DVideoPlayer.ipa --clobber` en `C:\dev\d_video_player`), para que quede listo para iLoader sin pasos manuales.
@@ -46,31 +46,37 @@ Comandos útiles:
   - **Panel reposicionable**: enum `PanelPosition` (top/bottom/leading/trailing), persistida en `@AppStorage("panelPosition")`, por defecto **arriba**. El panel es una cápsula con X, tiempo, velocidad y un menú de posición (ícono de flechas); en los laterales se vuelve vertical (`AnyLayout`) y el tiempo se apila. Durante el scrub el panel se atenúa (opacity 0.25).
   - **Liquid Glass**: modificador propio `liquidGlass(in:interactive:)` que usa `.glassEffect(.regular/.regular.interactive(), in:)` bajo `#available(iOS 26.0, *)` y cae a fondo negro translúcido en iOS < 26. Aplicado al panel y al indicador de scrub. El resto de la UI (lista, botones) toma el look nuevo automáticamente al compilar con el SDK de Xcode 27.
   - **Lista de videos**: la pantalla inicial es un `NavigationStack` con `List` de los MP4/M4V/MOV en Documents (la carpeta "D Video Player" de Archivos), con nombre, tamaño y fecha; tocar = reproducir (sin security scope). Pull-to-refresh, estado vacío con instrucciones (`ContentUnavailableView`), botón de carpeta en la toolbar para abrir de otra ubicación con `.fileImporter`, y la versión abajo.
+- Sesión 4 (elecciones de Daniel): **zoom de pellizco** como a una foto que se mantiene mientras ve el video, **mover con dos dedos** (un dedo queda para tap/scrub), y menú de zoom con **Normal / Llenar bordes / Estirar a pantalla**. El modo NO se recuerda entre videos: cada video abre en Normal (lo eligió así).
+- Sesión 4 (implementación):
+  - **Zoom de pellizco**: `UIPinchGestureRecognizer` + `UIPanGestureRecognizer` (min/max 2 dedos) en `VideoLayerView`, simultáneos entre sí (delegate). El `AVPlayerLayer` ahora vive en un hijo (`videoView`) dentro de `VideoGestureContainerView`, que le aplica `CGAffineTransform` (translación+escala). Escala 1–6×, anclada al punto del pellizco; el offset se clampa a `(escala−1)·tamaño/2` para no despegar el video de los bordes. Al soltar cerca de 1× vuelve exacto a 1× animado. Layout manual con `bounds`/`center` en `layoutSubviews` (con transform activo el `frame` es indefinido; NO usar autoresizing).
+  - **Modos de escala**: enum `VideoScaleMode` (fit/fill/stretch) → `videoGravity` (`.resizeAspect`/`.resizeAspectFill`/`.resize`). Menú en el panel (ícono `aspectratio`) entre velocidad y posición. Elegir cualquier modo también reinicia el pellizco a 1× (vía `zoomResetToken: Int` que `updateUIView` compara con el último valor en el Coordinator). Estado `@State` (no AppStorage), por decisión de Daniel.
 
 - **Icono (v0.6.0)**: monograma "D" cuya contraforma es un triángulo de play, sobre fondo degradado violeta→azul noche con brillos, y debajo una barra de scrub con progreso coral→ámbar y perilla luminosa (alude al gesto de arrastrar). Tres variantes en `Sources/Assets.xcassets/AppIcon.appiconset` (formato de tamaño único 1024): clara (RGB sin alfa), oscura (fondo transparente, D lavanda) y tintada (escala de grises, transparente). `ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon` en `project.yml`. Se genera con `tools/make_icon.py` (SVG renderizado con Playwright + Pillow); para retocarlo, editar el SVG ahí y regenerar.
 
 ## Estructura del código (Sources/)
 - `DVideoPlayerApp.swift` — entry point.
 - `ContentView.swift` — biblioteca: lista de videos de Documents (`VideoLibrary.scan()`, struct `VideoFile`), estado vacío, `.fileImporter` para otras carpetas, alerta de error, texto de versión; `VideoSelection` maneja el acceso security-scoped.
-- `PlayerScreen.swift` — pantalla de reproducción: play/pause, scrub, velocidad (`defaultRate`), panel reposicionable (`PanelPosition`), indicador de tiempo, `isIdleTimerDisabled`, helper `liquidGlass`.
-- `VideoLayerView.swift` — `UIViewRepresentable` con `AVPlayerLayer` + gestos UIKit (tap y mantener+arrastrar) que reporta por callbacks a `PlayerScreen`.
+- `PlayerScreen.swift` — pantalla de reproducción: play/pause, scrub, velocidad (`defaultRate`), menú de zoom (`VideoScaleMode`), panel reposicionable (`PanelPosition`), indicador de tiempo, `isIdleTimerDisabled`, helper `liquidGlass`.
+- `VideoLayerView.swift` — `UIViewRepresentable` con `VideoGestureContainerView` (zoom de pellizco/paneo por transform) que contiene el `AVPlayerLayer`; gestos UIKit (tap, mantener+arrastrar, pellizco, paneo a 2 dedos) que reporta por callbacks a `PlayerScreen`.
 
 ## Plan por sesiones
 - [x] **Sesión 0** — Pipeline: repo, XcodeGen, workflow, app "Hola mundo" instalada en el iPhone.
 - [x] **Sesión 1** — Reproductor base: abrir video desde Archivos, `AVPlayer` + `AVPlayerLayer` en SwiftUI, pantalla siempre encendida, tap = play/pause.
 - [x] **Sesión 2** — Gesto de scrub: mantener + arrastrar horizontal, indicador de tiempo en pantalla, sensibilidad, modo horizontal.
 - [x] **Sesión 3** — Velocidad de reproducción, lista de videos, panel reposicionable (arriba/abajo/laterales), Liquid Glass.
+- [x] **Sesión 4** — Zoom: pellizco con paneo a 2 dedos + menú Normal / Llenar bordes / Estirar.
 - [ ] **Pendientes posibles** — Recordar posición por video, imagen en imagen (PiP; ojo: con cuenta gratuita el background puede no funcionar), borrar videos desde la lista.
 
 ## Estado actual
-- Sesión 3 VALIDADA en el iPhone (2026-10-20): Daniel probó la v0.5.0 y dijo que "funciona muy bien" (velocidad, lista, panel reposicionable, Liquid Glass).
-- **v0.5.1 (build 6) VALIDADA en el iPhone (2026-10-20)**: Daniel la instaló y confirmó que funciona perfecto (velocidades lentas 0.25 / 0.4 / 0.7 / 0.8 incluidas). Commit `f847b10`, run 39481395603.
-- **v0.6.0 (build 7)** — icono de la app. Commit `b7c78a5`, run 39485976496 en verde; verificado que el `.ipa` trae `Assets.car`, `AppIcon60x60@2x.png` y `CFBundleIcons`. El `.ipa` ya está en la carpeta del repo. PENDIENTE: que Daniel confirme cómo se ve en el iPhone (si iOS muestra el icono viejo/en blanco, reiniciar el iPhone limpia la caché de iconos).
+- **v0.7.0 (build 8)** — zoom de pellizco + menú de zoom. Commit `07bbe8a`, run 39534166033 en verde (2026-10-20). El `.ipa` ya está descargado en la carpeta del repo. PENDIENTE: que Daniel lo instale y valide (pellizco, paneo 2 dedos, Normal/Llenar/Estirar, rotación con zoom activo).
+- v0.6.0 (build 7) — icono de la app: build en verde, `.ipa` verificado. PENDIENTE: que Daniel confirme cómo se ve el icono en el iPhone (si iOS muestra el icono viejo/en blanco, reiniciar el iPhone limpia la caché de iconos).
+- v0.5.1 (build 6) VALIDADA en el iPhone (2026-10-20): velocidad, lista, panel reposicionable, Liquid Glass, velocidades lentas.
 - Próximas ideas en "Pendientes posibles" del plan.
 
 ## Problemas conocidos
 - Los archivos de `.github/workflows` están protegidos para las herramientas remotas: el asistente no puede escribirlos. Si hay que cambiar el workflow, dejar el archivo en una carpeta temporal y pedirle a Daniel que lo mueva a `.github\workflows\`.
 - El script del workflow elige la Xcode más reciente instalada (hoy una beta). Si una beta da problemas, fijarlo a la versión estable.
+- El workflow compila con `CURRENT_PROJECT_VERSION=${{ github.run_number }}`, así que el "build" que muestra la app es el número de run de Actions, no el de `project.yml`.
 - iLoader falló al iniciar sesión con el Apple ID (error 502 del servidor anisette `new.ani.sidestore.io`, caído temporalmente). Si se repite: esperar, o instalar el .ipa desde el iPhone con SideStore.
 - GitHub Actions avisa que `actions/checkout@v4` y `upload-artifact@v4` usan Node 20 (deprecado); no bloquea nada, pero en algún momento conviene subirlas a v5.
 - `gh run watch` desde Cowork se corta a los ~60 s (límite del puente al PC); usar sondeos cortos con `gh run view`.
